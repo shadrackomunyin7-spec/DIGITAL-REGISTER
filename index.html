@@ -1,11 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>math app
-<body>maths app helps to solve mathatecal 
-    
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Class Register</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>Digital Class Register</h1>
+    <p id="todayDate"></p>
+  </header>
+
+  <main>
+
+    <section class="card">
+      <h2>Class Details</h2>
+      <input type="text" id="className" placeholder="Class name (e.g. Form 2 East)">
+      <input type="date" id="registerDate">
+    </section>
+
+    <section class="card">
+      <h2>Add Student</h2>
+      <div class="row">
+        <input type="text" id="studentName" placeholder="Student full name">
+        <button id="addBtn">Add</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Mark Attendance</h2>
+
+      <div class="summary">
+        <span>Total: <strong id="totalCount">0</strong></span>
+        <span class="present-text">Present: <strong id="presentCount">0</strong></span>
+        <span class="absent-text">Absent: <strong id="absentCount">0</strong></span>
+      </div>
+
+      <div class="row">
+        <button id="allPresentBtn" class="small">Mark All Present</button>
+        <button id="clearBtn" class="small danger">Clear Register</button>
+      </div>
+
+      <ul id="studentList"></ul>
+
+      <button id="saveBtn" class="save">Save Today's Register</button>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
