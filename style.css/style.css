@@ -1,62 +1,114 @@
+:root {
+  --navy: #0f2a4a;
+  --navy-dark: #0a1d34;
+  --teal: #0d9488;
+  --teal-dark: #0f766e;
+  --green: #16a34a;
+  --red: #dc2626;
+  --bg: #eef2f7;
+  --card: #ffffff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #dbe3ec;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-  background: hsl(270, 88%, 27%);
-  color: hsl(345, 24%, 16%);
-  padding-bottom: 40px;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 50px;
 }
 
+/* ---------- Header ---------- */
 header {
-  background: #1dd858;
-  color: #592626;
+  background: linear-gradient(135deg, var(--navy), var(--teal-dark));
+  color: white;
   text-align: center;
-  padding: 20px 10px;
+  padding: 28px 16px 24px;
+  box-shadow: 0 4px 14px rgba(15, 42, 74, 0.25);
 }
 
-header p {
-  margin-top: 6px;
+header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+header .byline {
+  margin-top: 4px;
   font-size: 14px;
+  font-style: italic;
   opacity: 0.9;
 }
 
+header #todayDate {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 5px 14px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+}
+
+/* ---------- Layout ---------- */
 main {
-  max-width: 600px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 15px;
+  padding: 20px 14px;
 }
 
 .card {
-  background: #652a2a;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  background: var(--card);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(15, 42, 74, 0.07);
 }
 
 .card h2 {
-  font-size: 18px;
-  margin-bottom: 10px;
-  color: #1d4ed8;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--teal);
+  display: inline-block;
 }
 
+/* ---------- Inputs ---------- */
 input[type="text"],
-input[type="date"] {
+input[type="date"],
+input[type="email"],
+input[type="password"] {
   width: 100%;
-  padding: 10px;
+  padding: 12px 14px;
   margin-bottom: 10px;
-  border: 1px solid hsl(212, 8%, 50%);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   font-size: 16px;
+  background: #f8fafc;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+  background: white;
 }
 
 .row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
@@ -65,18 +117,25 @@ input[type="date"] {
   flex: 1;
 }
 
+/* ---------- Buttons ---------- */
 button {
-  background: #1d4ed8;
+  background: var(--teal);
   color: white;
   border: none;
-  padding: 10px 16px;
-  border-radius: 6px;
+  padding: 12px 18px;
+  border-radius: 10px;
   font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
 }
 
 button:hover {
-  opacity: 0.9;
+  background: var(--teal-dark);
+}
+
+button:active {
+  transform: scale(0.97);
 }
 
 button.small {
@@ -85,65 +144,140 @@ button.small {
 }
 
 button.danger {
-  background: #dc2626;
+  background: var(--red);
+}
+
+button.danger:hover {
+  background: #b91c1c;
 }
 
 button.save {
   width: 100%;
-  background: #16a34a;
-  margin-top: 10px;
-  padding: 12px;
+  background: linear-gradient(135deg, var(--navy), var(--navy-dark));
+  margin-top: 14px;
+  padding: 14px;
   font-size: 16px;
 }
 
+button.save:hover {
+  background: var(--navy-dark);
+}
+
+button.linklike {
+  background: transparent;
+  color: var(--teal-dark);
+  text-decoration: underline;
+  padding: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+button.linklike:hover {
+  background: transparent;
+  color: var(--navy);
+}
+
+/* ---------- Summary ---------- */
 .summary {
   display: flex;
-  justify-content: space-between;
-  background: #f0f4f8;
-  padding: 10px;
-  border-radius: 6px;
-  margin-bottom: 10px;
+  justify-content: space-around;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 14px;
   font-size: 15px;
+  text-align: center;
+}
+
+.summary strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 2px;
 }
 
 .present-text {
-  color: #16a34a;
+  color: var(--green);
 }
 
 .absent-text {
-  color: #dc2626;
+  color: var(--red);
 }
 
+/* ---------- Student list ---------- */
 ul {
   list-style: none;
+  margin-top: 6px;
 }
 
 li.student {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid #e4e7eb;
+  padding: 12px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+li.student:last-child {
+  border-bottom: none;
 }
 
 li.student .name {
   flex: 1;
   font-size: 16px;
+  font-weight: 500;
 }
 
 li.student .actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  align-items: center;
 }
 
 .status-btn {
-  padding: 6px 12px;
-  font-size: 13px;
-  background: #e4e7eb;
-  color: #1f2933;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: var(--muted);
+  border-radius: 50%;
+}
+
+.status-btn:hover {
+  background: #cbd5e1;
 }
 
 .status-btn.present.active {
-  background: #16a34a;
+  background: var(--green);
   color: white;
+}
+
+.status-btn.absent.active {
+  background: var(--red);
+  color: white;
+}
+
+.remove-btn {
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  padding: 0 8px;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  background: transparent;
+  color: var(--red);
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 22px;
+  }
+  .card {
+    padding: 14px;
+  }
 }
