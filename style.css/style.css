@@ -272,6 +272,17 @@ li.student .actions {
   color: var(--red);
 }
 
+/* ---------- Login buttons gap ---------- */
+#authSection .row {
+  display: flex;
+  gap: 30px;
+  margin-top: 8px;
+}
+
+#authSection .row button {
+  flex: 1;
+}
+
 /* ---------- Small screens ---------- */
 @media (max-width: 480px) {
   header h1 {

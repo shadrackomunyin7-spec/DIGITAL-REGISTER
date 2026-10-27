@@ -25,6 +25,7 @@ let currentUser = null;
 
 const studentList = document.getElementById("studentList");
 const studentName = document.getElementById("studentName");
+const admNo = document.getElementById("admNo");
 const className = document.getElementById("className");
 const registerDate = document.getElementById("registerDate");
 const authSection = document.getElementById("authSection");
@@ -130,11 +131,11 @@ function render() {
     li.className = "student";
 
     li.innerHTML =
-      '<span class="name">' + (index + 1) + ". " + student.name + "</span>" +
+      '<span class="name">' + (index + 1) + ". " + student.name + (student.adm ? " (" + student.adm + ")" : "") + "</span>" +
       '<div class="actions">' +
       '<button class="status-btn present ' + (student.status === "present" ? "active" : "") + '" data-i="' + index + '" data-s="present">P</button>' +
       '<button class="status-btn absent ' + (student.status === "absent" ? "active" : "") + '" data-i="' + index + '" data-s="absent">A</button>' +
-      '<button class="remove-btn" data-i="' + index + '" data-remove="1">×</button>' +
+      '<button class="remove-btn" data-i="' + index + '" data-remove="1">\u00d7</button>' +
       "</div>";
 
     studentList.appendChild(li);
@@ -167,17 +168,25 @@ studentList.addEventListener("click", function (e) {
 
 document.getElementById("addBtn").addEventListener("click", function () {
   const name = studentName.value.trim();
+  const adm = admNo.value.trim();
   if (name === "") {
     alert("Please type the student's name.");
     return;
   }
-  students.push({ name: name, status: "none" });
+  students.push({ name: name, adm: adm, status: "none" });
   studentName.value = "";
+  admNo.value = "";
   studentName.focus();
   render();
 });
 
 studentName.addEventListener("keypress", function (e) {
+  if (e.key === "Enter") {
+    admNo.focus();
+  }
+});
+
+admNo.addEventListener("keypress", function (e) {
   if (e.key === "Enter") {
     document.getElementById("addBtn").click();
   }
