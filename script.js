@@ -1,3 +1,20 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC5Pt8qlr3RFSuX9mf4fJDyNYT9nh7RCcE",
+  authDomain: "class-register-fc41d.firebaseapp.com",
+  projectId: "class-register-fc41d",
+  storageBucket: "class-register-fc41d.firebasestorage.app",
+  messagingSenderId: "960824285359",
+  appId: "1:960824285359:web:5151a6530e1b2ef2111c5a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 let students = [];
 
 const studentList = document.getElementById("studentList");
@@ -5,29 +22,27 @@ const studentName = document.getElementById("studentName");
 const className = document.getElementById("className");
 const registerDate = document.getElementById("registerDate");
 
-// Show today's date
 const today = new Date();
 document.getElementById("todayDate").textContent = today.toDateString();
 registerDate.value = today.toISOString().split("T")[0];
 
-// Load saved register for the chosen date
-function storageKey() {
-  return "register_" + registerDate.value;
+// One record per class per date, e.g. "Form 2 East_2026-10-28"
+function recordId() {
+  const cls = className.value.trim() || "default";
+  return cls + "_" + registerDate.value;
 }
 
-function loadRegister() {
-  const saved = localStorage.getItem(storageKey());
-  if (saved) {
-    const data = JSON.parse(saved);
-    students = data.students;
-    className.value = data.className || "";
-  } else {
+async function loadRegister() {
+  try {
+    const snap = await getDoc(doc(db, "registers", recordId()));
+    students = snap.exists() ? snap.data().students : [];
+  } catch (e) {
+    alert("Could not load: " + e.message);
     students = [];
   }
   render();
 }
 
-// Draw the list on the screen
 function render() {
   studentList.innerHTML = "";
 
@@ -38,9 +53,9 @@ function render() {
     li.innerHTML =
       '<span class="name">' + (index + 1) + ". " + student.name + "</span>" +
       '<div class="actions">' +
-      '<button class="status-btn present ' + (student.status === "present" ? "active" : "") + '" onclick="setStatus(' + index + ", 'present')\">P</button>" +
-      '<button class="status-btn absent ' + (student.status === "absent" ? "active" : "") + '" onclick="setStatus(' + index + ", 'absent')\">A</button>" +
-      '<button class="remove-btn" onclick="removeStudent(' + index + ')">×</button>' +
+      '<button class="status-btn present ' + (student.status === "present" ? "active" : "") + '" data-i="' + index + '" data-s="present">P</button>' +
+      '<button class="status-btn absent ' + (student.status === "absent" ? "active" : "") + '" data-i="' + index + '" data-s="absent">A</button>' +
+      '<button class="remove-btn" data-i="' + index + '" data-remove="1">×</button>' +
       "</div>";
 
     studentList.appendChild(li);
@@ -58,17 +73,20 @@ function updateCounts() {
   document.getElementById("absentCount").textContent = absent;
 }
 
-function setStatus(index, status) {
-  students[index].status = status;
-  render();
-}
+// Handle P, A and remove buttons
+studentList.addEventListener("click", function (e) {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const i = Number(btn.dataset.i);
 
-function removeStudent(index) {
-  students.splice(index, 1);
+  if (btn.dataset.remove) {
+    students.splice(i, 1);
+  } else {
+    students[i].status = btn.dataset.s;
+  }
   render();
-}
+});
 
-// Add a student
 document.getElementById("addBtn").addEventListener("click", function () {
   const name = studentName.value.trim();
   if (name === "") {
@@ -81,20 +99,17 @@ document.getElementById("addBtn").addEventListener("click", function () {
   render();
 });
 
-// Press Enter to add
 studentName.addEventListener("keypress", function (e) {
   if (e.key === "Enter") {
     document.getElementById("addBtn").click();
   }
 });
 
-// Mark everyone present
 document.getElementById("allPresentBtn").addEventListener("click", function () {
   students.forEach(function (s) { s.status = "present"; });
   render();
 });
 
-// Clear the register
 document.getElementById("clearBtn").addEventListener("click", function () {
   if (confirm("Clear all students from this register?")) {
     students = [];
@@ -102,17 +117,26 @@ document.getElementById("clearBtn").addEventListener("click", function () {
   }
 });
 
-// Save the register
-document.getElementById("saveBtn").addEventListener("click", function () {
-  const data = {
-    className: className.value,
-    students: students
-  };
-  localStorage.setItem(storageKey(), JSON.stringify(data));
-  alert("Register saved for " + registerDate.value);
+// Save to Firebase so every teacher sees it
+document.getElementById("saveBtn").addEventListener("click", async function () {
+  if (className.value.trim() === "") {
+    alert("Please type the class name first.");
+    return;
+  }
+  try {
+    await setDoc(doc(db, "registers", recordId()), {
+      className: className.value.trim(),
+      date: registerDate.value,
+      students: students
+    });
+    alert("Saved online for " + className.value + " on " + registerDate.value);
+  } catch (e) {
+    alert("Could not save: " + e.message);
+  }
 });
 
-// Load when the date changes
+// Reload when class or date changes
 registerDate.addEventListener("change", loadRegister);
+className.addEventListener("change", loadRegister);
 
-loadRegister();
+render();
