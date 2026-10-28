@@ -37,13 +37,12 @@ const today = new Date();
 document.getElementById("todayDate").textContent = today.toDateString();
 registerDate.value = today.toISOString().split("T")[0];
 
-// Makes typed text safe to show on the page
-function esc(text) {
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+// Small helper: make an element with a class and text (safe, no HTML needed)
+function make(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
 // ---------- LOGIN ----------
@@ -128,33 +127,36 @@ function registerRef() {
   return doc(db, "users", currentUser.uid, "registers", classKey() + "_" + registerDate.value);
 }
 
-// ---------- LOAD ----------
+// ---------- LOAD (saved day first, then class list) ----------
 async function loadRegister() {
   if (!currentUser) return;
   try {
-    const rosterSnap = await getDoc(rosterRef());
-    const roster = rosterSnap.exists() ? rosterSnap.data().students : [];
-
     const regSnap = await getDoc(registerRef());
-    const marks = {};
-    if (regSnap.exists()) {
-      regSnap.data().students.forEach(function (s) {
-        marks[s.name + "|" + (s.adm || "")] = s.status;
+
+    if (regSnap.exists() && regSnap.data().students && regSnap.data().students.length > 0) {
+      // Show exactly what was saved on that day
+      students = regSnap.data().students.map(function (s) {
+        return {
+          name: s.name,
+          adm: s.adm || "",
+          status: s.status || "none"
+        };
       });
-    }
-
-    students = roster.map(function (s) {
-      return {
-        name: s.name,
-        adm: s.adm || "",
-        status: marks[s.name + "|" + (s.adm || "")] || "none"
-      };
-    });
-
-    if (roster.length > 0) {
-      rosterNote.textContent = roster.length + " students loaded for this class. Just tick P, A or X.";
+      rosterNote.textContent = "Saved register for " + registerDate.value + ": " + students.length + " students.";
     } else {
-      rosterNote.textContent = "No students saved for this class yet. Add them below, once only.";
+      // New day: load the permanent class list with no ticks
+      const rosterSnap = await getDoc(rosterRef());
+      const roster = rosterSnap.exists() ? rosterSnap.data().students : [];
+
+      students = roster.map(function (s) {
+        return { name: s.name, adm: s.adm || "", status: "none" };
+      });
+
+      if (roster.length > 0) {
+        rosterNote.textContent = roster.length + " students loaded for this class. Just tick P, A or X.";
+      } else {
+        rosterNote.textContent = "No students saved for this class yet. Add them below, once only.";
+      }
     }
   } catch (e) {
     alert("Could not load: " + e.message);
@@ -166,27 +168,30 @@ async function loadRegister() {
 // ---------- SAVED REGISTERS LIST ----------
 async function loadSavedList() {
   if (!currentUser) return;
-  savedList.innerHTML = "";
+  savedList.textContent = "";
   try {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "registers"));
     const items = [];
     snap.forEach(function (d) { items.push(d.data()); });
 
     if (items.length === 0) {
-      savedList.innerHTML = '<li><span class="saved-date">No saved registers yet.</span></li>';
+      const li = make("li");
+      li.appendChild(make("span", "saved-date", "No saved registers yet."));
+      savedList.appendChild(li);
       return;
     }
 
     items.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
 
     items.forEach(function (item) {
-      const li = document.createElement("li");
-      li.innerHTML =
-        '<span class="saved-title">' + esc(item.className) + "</span>" +
-        '<span class="saved-date">' + esc(item.date) +
+      const li = make("li");
+      li.appendChild(make("span", "saved-title", item.className || ""));
+      li.appendChild(make("span", "saved-date",
+        (item.date || "") +
         " | P: " + (item.present || 0) +
         " A: " + (item.absent || 0) +
-        " X: " + (item.excused || 0) + "</span>";
+        " X: " + (item.excused || 0)
+      ));
       li.addEventListener("click", function () {
         className.value = item.className;
         registerDate.value = item.date;
@@ -196,27 +201,51 @@ async function loadSavedList() {
       savedList.appendChild(li);
     });
   } catch (e) {
-    savedList.innerHTML = '<li><span class="saved-date">Could not load list: ' + esc(e.message) + "</span></li>";
+    savedList.textContent = "";
+    const li = make("li");
+    li.appendChild(make("span", "saved-date", "Could not load list: " + e.message));
+    savedList.appendChild(li);
   }
 }
 
 document.getElementById("refreshSavedBtn").addEventListener("click", loadSavedList);
 
 // ---------- DRAW THE TABLE ----------
+function statusButton(index, status, label, current) {
+  const btn = make("button", "status-btn " + status + (current === status ? " active" : ""), label);
+  btn.dataset.i = index;
+  btn.dataset.s = status;
+  return btn;
+}
+
 function render() {
-  studentList.innerHTML = "";
+  studentList.textContent = "";
 
   students.forEach(function (student, index) {
     const tr = document.createElement("tr");
 
-    tr.innerHTML =
-      "<td>" + (index + 1) + "</td>" +
-      "<td>" + esc(student.name) + "</td>" +
-      "<td>" + esc(student.adm || "-") + "</td>" +
-      '<td><button class="status-btn present ' + (student.status === "present" ? "active" : "") + '" data-i="' + index + '" data-s="present">P</button></td>' +
-      '<td><button class="status-btn absent ' + (student.status === "absent" ? "active" : "") + '" data-i="' + index + '" data-s="absent">A</button></td>' +
-      '<td><button class="status-btn excused ' + (student.status === "excused" ? "active" : "") + '" data-i="' + index + '" data-s="excused">X</button></td>' +
-      '<td><button class="remove-btn" data-i="' + index + '" data-remove="1">\u00d7</button></td>';
+    tr.appendChild(make("td", "", String(index + 1)));
+    tr.appendChild(make("td", "", student.name));
+    tr.appendChild(make("td", "", student.adm || "-"));
+
+    const tdP = document.createElement("td");
+    tdP.appendChild(statusButton(index, "present", "P", student.status));
+    tr.appendChild(tdP);
+
+    const tdA = document.createElement("td");
+    tdA.appendChild(statusButton(index, "absent", "A", student.status));
+    tr.appendChild(tdA);
+
+    const tdX = document.createElement("td");
+    tdX.appendChild(statusButton(index, "excused", "X", student.status));
+    tr.appendChild(tdX);
+
+    const tdD = document.createElement("td");
+    const del = make("button", "remove-btn", "\u00d7");
+    del.dataset.i = index;
+    del.dataset.remove = "1";
+    tdD.appendChild(del);
+    tr.appendChild(tdD);
 
     studentList.appendChild(tr);
   });
@@ -364,5 +393,3 @@ document.getElementById("saveBtn").addEventListener("click", async function () {
 // ---------- RELOAD WHEN CLASS OR DATE CHANGES ----------
 registerDate.addEventListener("change", loadRegister);
 className.addEventListener("change", loadRegister);
-
-render();
