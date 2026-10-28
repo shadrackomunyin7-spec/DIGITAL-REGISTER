@@ -37,6 +37,15 @@ const today = new Date();
 document.getElementById("todayDate").textContent = today.toDateString();
 registerDate.value = today.toISOString().split("T")[0];
 
+// Makes typed text safe to show on the page
+function esc(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 // ---------- LOGIN ----------
 function friendlyError(e) {
   const code = e.code || "";
@@ -173,9 +182,11 @@ async function loadSavedList() {
     items.forEach(function (item) {
       const li = document.createElement("li");
       li.innerHTML =
-        '<span class="saved-title">' + item.className + "</span>" +
-        '<span class="saved-date">' + item.date + " | P: " + (item.present || 0) +
-        " A: " + (item.absent || 0) + " X: " + (item.excused || 0) + "</span>";
+        '<span class="saved-title">' + esc(item.className) + "</span>" +
+        '<span class="saved-date">' + esc(item.date) +
+        " | P: " + (item.present || 0) +
+        " A: " + (item.absent || 0) +
+        " X: " + (item.excused || 0) + "</span>";
       li.addEventListener("click", function () {
         className.value = item.className;
         registerDate.value = item.date;
@@ -185,7 +196,7 @@ async function loadSavedList() {
       savedList.appendChild(li);
     });
   } catch (e) {
-    savedList.innerHTML = '<li><span class="saved-date">Could not load list: ' + e.message + "</span></li>";
+    savedList.innerHTML = '<li><span class="saved-date">Could not load list: ' + esc(e.message) + "</span></li>";
   }
 }
 
@@ -200,8 +211,8 @@ function render() {
 
     tr.innerHTML =
       "<td>" + (index + 1) + "</td>" +
-      "<td>" + student.name + "</td>" +
-      "<td>" + (student.adm || "-") + "</td>" +
+      "<td>" + esc(student.name) + "</td>" +
+      "<td>" + esc(student.adm || "-") + "</td>" +
       '<td><button class="status-btn present ' + (student.status === "present" ? "active" : "") + '" data-i="' + index + '" data-s="present">P</button></td>' +
       '<td><button class="status-btn absent ' + (student.status === "absent" ? "active" : "") + '" data-i="' + index + '" data-s="absent">A</button></td>' +
       '<td><button class="status-btn excused ' + (student.status === "excused" ? "active" : "") + '" data-i="' + index + '" data-s="excused">X</button></td>' +
