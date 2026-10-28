@@ -10,7 +10,7 @@
 
   <header>
     <h1>Omunyin Digital Register</h1>
-    <p class="byline">by Omunyin Shadrack</p>
+    <p class="byline">by Omunyin Shadrach</p>
     <p id="todayDate"></p>
   </header>
 
@@ -42,10 +42,11 @@
         <h2>Class Details</h2>
         <input type="text" id="className" placeholder="Class name (e.g. Form 2 East)">
         <input type="date" id="registerDate">
+        <p id="rosterNote" class="note"></p>
       </section>
 
       <section class="card">
-        <h2>Add Student</h2>
+        <h2>Add New Student</h2>
         <input type="text" id="studentName" placeholder="Student full name">
         <div class="row">
           <input type="text" id="admNo" placeholder="Admission number">
@@ -64,12 +65,34 @@
 
         <div class="row">
           <button id="allPresentBtn" class="small">Mark All Present</button>
-          <button id="clearBtn" class="small danger">Clear Register</button>
+          <button id="clearBtn" class="small danger">Reset Marks</button>
         </div>
 
-        <ul id="studentList"></ul>
+        <div class="table-wrap">
+          <table id="studentTable">
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Student Name</th>
+                <th>Adm No.</th>
+                <th>P</th>
+                <th>A</th>
+                <th>X</th>
+                <th>Del</th>
+              </tr>
+            </thead>
+            <tbody id="studentList"></tbody>
+          </table>
+        </div>
 
         <button id="saveBtn" class="save">Save Today's Register</button>
+      </section>
+
+      <section class="card">
+        <h2>Saved Registers</h2>
+        <p class="note">Tap any entry to open that day's register.</p>
+        <ul id="savedList"></ul>
+        <button id="refreshSavedBtn" class="small">Refresh List</button>
       </section>
 
     </div>

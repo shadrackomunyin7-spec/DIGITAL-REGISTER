@@ -5,6 +5,7 @@
   --teal-dark: #0f766e;
   --green: #16a34a;
   --red: #dc2626;
+  --blue: #2563eb;
   --bg: #eef2f7;
   --card: #ffffff;
   --text: #1e293b;
@@ -81,6 +82,12 @@ main {
   padding-bottom: 8px;
   border-bottom: 2px solid var(--teal);
   display: inline-block;
+}
+
+.note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 /* ---------- Inputs ---------- */
@@ -177,6 +184,33 @@ button.linklike:hover {
   color: var(--navy);
 }
 
+/* ---------- Login buttons: colours and gap ---------- */
+#authSection .row {
+  display: flex;
+  gap: 30px;
+  margin-top: 8px;
+}
+
+#authSection .row button {
+  flex: 1;
+}
+
+#loginBtn {
+  background: var(--red);
+}
+
+#loginBtn:hover {
+  background: #b91c1c;
+}
+
+#signupBtn {
+  background: var(--blue);
+}
+
+#signupBtn:hover {
+  background: #1d4ed8;
+}
+
 /* ---------- Summary ---------- */
 .summary {
   display: flex;
@@ -204,41 +238,47 @@ button.linklike:hover {
   color: var(--red);
 }
 
-/* ---------- Student list ---------- */
-ul {
-  list-style: none;
+/* ---------- Student table ---------- */
+.table-wrap {
+  overflow-x: auto;
   margin-top: 6px;
 }
 
-li.student {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 6px;
+#studentTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+#studentTable th {
+  background: var(--navy);
+  color: white;
+  padding: 10px 6px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+#studentTable th:nth-child(2),
+#studentTable td:nth-child(2) {
+  text-align: left;
+}
+
+#studentTable td {
+  padding: 8px 6px;
+  text-align: center;
   border-bottom: 1px solid var(--border);
 }
 
-li.student:last-child {
-  border-bottom: none;
-}
-
-li.student .name {
-  flex: 1;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-li.student .actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+#studentTable tbody tr:nth-child(even) {
+  background: #f8fafc;
 }
 
 .status-btn {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   background: #e2e8f0;
   color: var(--muted);
@@ -259,6 +299,11 @@ li.student .actions {
   color: white;
 }
 
+.status-btn.excused.active {
+  background: #f59e0b;
+  color: white;
+}
+
 .remove-btn {
   background: transparent;
   color: var(--muted);
@@ -272,15 +317,42 @@ li.student .actions {
   color: var(--red);
 }
 
-/* ---------- Login buttons gap ---------- */
-#authSection .row {
-  display: flex;
-  gap: 30px;
-  margin-top: 8px;
+/* ---------- Saved registers list ---------- */
+ul {
+  list-style: none;
+  margin-top: 6px;
 }
 
-#authSection .row button {
-  flex: 1;
+#savedList {
+  margin-bottom: 12px;
+}
+
+#savedList li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--teal);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#savedList li:hover {
+  background: #e2e8f0;
+}
+
+#savedList .saved-title {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+#savedList .saved-date {
+  font-size: 13px;
+  color: var(--muted);
 }
 
 /* ---------- Small screens ---------- */
@@ -290,5 +362,8 @@ li.student .actions {
   }
   .card {
     padding: 14px;
+  }
+  #studentTable {
+    font-size: 14px;
   }
 }
