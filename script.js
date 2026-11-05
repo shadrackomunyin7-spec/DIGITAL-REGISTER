@@ -40,7 +40,15 @@ const approverName = document.getElementById("approverName");
 
 const today = new Date();
 document.getElementById("todayDate").textContent = today.toDateString();
-registerDate.value = today.toISOString().split("T")[0];
+
+// Local date as YYYY-MM-DD (uses the phone/laptop clock, not UTC)
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
+registerDate.value = localDateStr(today);
 
 // Small helper: make an element with a class and text (safe, no HTML needed)
 function make(tag, cls, text) {
@@ -126,6 +134,8 @@ onAuthStateChanged(auth, function (user) {
     authSection.style.display = "none";
     appSection.style.display = "block";
     document.getElementById("userEmail").textContent = user.email;
+    registerDate.value = localDateStr(new Date());
+    updateDayLine();
     loadStamp();
     loadRegister();
     loadSavedList();
@@ -516,6 +526,10 @@ document.getElementById("saveBtn").addEventListener("click", async function () {
   if (students.length === 0) {
     alert("Add students to the class first.");
     return;
+  }
+
+  if (registerDate.value !== localDateStr(new Date())) {
+    if (!confirm("The date is " + dayText(registerDate.value) + ", not today. Save for that date?")) return;
   }
 
   try {
