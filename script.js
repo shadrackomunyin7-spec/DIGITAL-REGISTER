@@ -36,6 +36,7 @@ const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
 const rosterNote = document.getElementById("rosterNote");
 const savedList = document.getElementById("savedList");
+const classList = document.getElementById("classList");
 const approverName = document.getElementById("approverName");
 
 const today = new Date();
@@ -139,6 +140,7 @@ onAuthStateChanged(auth, function (user) {
     loadStamp();
     loadRegister();
     loadSavedList();
+    loadClassList();
   } else {
     authSection.style.display = "block";
     appSection.style.display = "none";
@@ -217,6 +219,48 @@ async function loadRegister() {
   renderApproval();
 }
 
+// ---------- MY CLASSES (tap a class to mark TODAY, no retyping) ----------
+async function loadClassList() {
+  if (!currentUser) return;
+  classList.textContent = "";
+  try {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "classes"));
+    const items = [];
+    snap.forEach(function (d) {
+      const data = d.data();
+      if (data.className) items.push(data);
+    });
+
+    if (items.length === 0) {
+      const li = make("li");
+      li.appendChild(make("span", "saved-date", "No classes yet. Type a class name below, then add your students once."));
+      classList.appendChild(li);
+      return;
+    }
+
+    items.sort(function (a, b) { return a.className.localeCompare(b.className); });
+
+    items.forEach(function (item) {
+      const li = make("li");
+      li.appendChild(make("span", "saved-title", item.className));
+      li.appendChild(make("span", "saved-date", (item.students ? item.students.length : 0) + " students"));
+      li.addEventListener("click", async function () {
+        className.value = item.className;
+        registerDate.value = localDateStr(new Date());
+        updateDayLine();
+        await loadRegister();
+        document.getElementById("amTab").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      classList.appendChild(li);
+    });
+  } catch (e) {
+    classList.textContent = "";
+    const li = make("li");
+    li.appendChild(make("span", "saved-date", "Could not load classes: " + e.message));
+    classList.appendChild(li);
+  }
+}
+
 // ---------- SAVED REGISTERS LIST ----------
 async function loadSavedList() {
   if (!currentUser) return;
@@ -248,8 +292,9 @@ async function loadSavedList() {
         className.value = item.className;
         registerDate.value = item.date;
         updateDayLine();
-        loadRegister();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        loadRegister().then(function () {
+          document.getElementById("reportBox").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
       });
       savedList.appendChild(li);
     });
@@ -351,7 +396,7 @@ const GROUP_TITLES = [
   ["am", "Present morning only"],
   ["pm", "Present afternoon only"],
   ["abs", "Absent"],
-  ["exc", "Excused"]
+  ["exc", "Excused (sent apology)"]
 ];
 
 function renderReport() {
@@ -422,6 +467,7 @@ async function saveRoster() {
       className: className.value.trim(),
       students: roster
     });
+    loadClassList();
   } catch (e) {
     alert("Could not save class list: " + e.message);
   }

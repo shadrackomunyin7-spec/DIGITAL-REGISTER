@@ -523,6 +523,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   body { background: #fff; }
 }
 
+
+#classList { margin-bottom: 12px; }
+#classList li { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 8px; background: #f5f3ff; border: 1px solid var(--border); border-left: 4px solid var(--purple); border-radius: 10px; cursor: pointer; }
+#classList li:hover { background: #ede9fe; }
+#classList .saved-title { font-weight: 600; color: var(--navy); }
+#classList .saved-date { font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -561,6 +567,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
       <!-- card 2 -->
       <section class="card">
         <h2>Class Details</h2>
+        <p class="note">Tap your class to mark today. No need to type the students again.</p>
+        <ul id="classList"></ul>
+        <p class="note">New class? Type its name here, then add the students once.</p>
         <input type="text" id="className" placeholder="Class name (e.g. Form 2 East)">
         <input type="date" id="registerDate">
         <p class="note" id="dayLine"></p>
@@ -645,7 +654,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
       <!-- card 7 -->
       <section class="card">
         <h2>Saved Registers</h2>
-        <p class="note">Tap any saved day to open it.</p>
+        <p class="note">History: tap a day to see who was present, absent and excused. To mark today, tap your class at the top.</p>
         <ul id="savedList"></ul>
         <button id="refreshSavedBtn" class="linklike">Refresh list</button>
       </section>
