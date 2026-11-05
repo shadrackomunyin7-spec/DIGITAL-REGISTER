@@ -31,6 +31,7 @@
     <!-- REGISTER SECTION (hidden until login) -->
     <div id="appSection" style="display:none;">
 
+      <!-- card 1 -->
       <section class="card">
         <div class="row">
           <span id="userEmail" style="flex:1; align-self:center;"></span>
@@ -38,13 +39,16 @@
         </div>
       </section>
 
+      <!-- card 2 -->
       <section class="card">
         <h2>Class Details</h2>
         <input type="text" id="className" placeholder="Class name (e.g. Form 2 East)">
         <input type="date" id="registerDate">
+        <p class="note" id="dayLine"></p>
         <p class="note" id="rosterNote"></p>
       </section>
 
+      <!-- card 3 -->
       <section class="card">
         <h2>Add New Student</h2>
         <input type="text" id="studentName" placeholder="Student full name">
@@ -54,8 +58,14 @@
         </div>
       </section>
 
+      <!-- card 4 -->
       <section class="card">
         <h2>Mark Attendance</h2>
+
+        <div class="tabs">
+          <button id="amTab" class="tab active">Morning</button>
+          <button id="pmTab" class="tab">Afternoon</button>
+        </div>
 
         <div class="summary">
           <span>Total: <strong id="totalCount">0</strong></span>
@@ -88,6 +98,32 @@
         <button id="saveBtn" class="save">Save Today's Register</button>
       </section>
 
+      <!-- card 5 -->
+      <section class="card">
+        <h2>Register Report</h2>
+        <div id="reportBox"></div>
+        <button id="printBtn" class="linklike">Print or save as PDF</button>
+      </section>
+
+      <!-- card 6 -->
+      <section class="card">
+        <h2>Approval</h2>
+        <div id="signForm">
+          <p class="note">Deputy principal: type your name, sign in the box, then approve. The register will be locked.</p>
+          <input type="text" id="approverName" placeholder="Name of deputy principal">
+          <canvas id="sigCanvas" width="400" height="150"></canvas>
+          <div class="row">
+            <button id="sigClearBtn" class="small danger">Clear signature</button>
+            <button id="stampBtn" class="small">Upload school stamp</button>
+          </div>
+          <input type="file" id="stampFile" accept="image/*" style="display:none;">
+          <img id="stampPreview" alt="School stamp" style="display:none;">
+          <button id="approveBtn" class="save">Approve and lock register</button>
+        </div>
+        <div id="approvalView" style="display:none;"></div>
+      </section>
+
+      <!-- card 7 -->
       <section class="card">
         <h2>Saved Registers</h2>
         <p class="note">Tap any saved day to open it.</p>

@@ -22,6 +22,10 @@ const auth = getAuth(app);
 
 let students = [];
 let currentUser = null;
+let session = "am";      // "am" = morning, "pm" = afternoon
+let approval = null;     // approval details of the open register
+let locked = false;      // true once the register is approved
+let stampData = "";      // school stamp image
 
 const studentList = document.getElementById("studentList");
 const studentName = document.getElementById("studentName");
@@ -32,6 +36,7 @@ const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
 const rosterNote = document.getElementById("rosterNote");
 const savedList = document.getElementById("savedList");
+const approverName = document.getElementById("approverName");
 
 const today = new Date();
 document.getElementById("todayDate").textContent = today.toDateString();
@@ -44,6 +49,25 @@ function make(tag, cls, text) {
   if (text !== undefined) node.textContent = text;
   return node;
 }
+
+// ---------- DATE AND DAY OF THE WEEK ----------
+function dateObj(str) {
+  const p = str.split("-").map(Number);
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+function dayName(str) {
+  return str ? dateObj(str).toLocaleDateString("en-GB", { weekday: "long" }) : "";
+}
+function dayText(str) {
+  if (!str) return "";
+  return dayName(str) + ", " + dateObj(str).toLocaleDateString("en-GB", {
+    day: "numeric", month: "long", year: "numeric"
+  });
+}
+function updateDayLine() {
+  document.getElementById("dayLine").textContent = dayText(registerDate.value);
+}
+updateDayLine();
 
 // ---------- LOGIN ----------
 function friendlyError(e) {
@@ -102,13 +126,18 @@ onAuthStateChanged(auth, function (user) {
     authSection.style.display = "none";
     appSection.style.display = "block";
     document.getElementById("userEmail").textContent = user.email;
+    loadStamp();
     loadRegister();
     loadSavedList();
   } else {
     authSection.style.display = "block";
     appSection.style.display = "none";
     students = [];
+    approval = null;
+    locked = false;
+    stampData = "";
     render();
+    renderApproval();
   }
 });
 
@@ -127,29 +156,41 @@ function registerRef() {
   return doc(db, "users", currentUser.uid, "registers", classKey() + "_" + registerDate.value);
 }
 
+// School stamp: users/{uid}/settings/stamp
+function stampRef() {
+  return doc(db, "users", currentUser.uid, "settings", "stamp");
+}
+
 // ---------- LOAD (saved day first, then class list) ----------
 async function loadRegister() {
   if (!currentUser) return;
+  approval = null;
+  locked = false;
   try {
     const regSnap = await getDoc(registerRef());
 
     if (regSnap.exists() && regSnap.data().students && regSnap.data().students.length > 0) {
-      // Show exactly what was saved on that day
-      students = regSnap.data().students.map(function (s) {
+      // Show exactly what was saved on that day (old registers still open fine)
+      const data = regSnap.data();
+      students = data.students.map(function (s) {
         return {
           name: s.name,
           adm: s.adm || "",
-          status: s.status || "none"
+          am: s.am || s.status || "none",
+          pm: s.pm || s.status || "none"
         };
       });
-      rosterNote.textContent = "Saved register for " + registerDate.value + ": " + students.length + " students.";
+      approval = data.approval || null;
+      locked = !!approval;
+      rosterNote.textContent = "Saved register for " + dayText(registerDate.value) + ": " +
+        students.length + " students." + (locked ? " Approved and locked." : "");
     } else {
       // New day: load the permanent class list with no ticks
       const rosterSnap = await getDoc(rosterRef());
       const roster = rosterSnap.exists() ? rosterSnap.data().students : [];
 
       students = roster.map(function (s) {
-        return { name: s.name, adm: s.adm || "", status: "none" };
+        return { name: s.name, adm: s.adm || "", am: "none", pm: "none" };
       });
 
       if (roster.length > 0) {
@@ -163,6 +204,7 @@ async function loadRegister() {
     students = [];
   }
   render();
+  renderApproval();
 }
 
 // ---------- SAVED REGISTERS LIST ----------
@@ -185,9 +227,9 @@ async function loadSavedList() {
 
     items.forEach(function (item) {
       const li = make("li");
-      li.appendChild(make("span", "saved-title", item.className || ""));
+      li.appendChild(make("span", "saved-title", (item.className || "") + (item.approval ? " \u2714" : "")));
       li.appendChild(make("span", "saved-date",
-        (item.date || "") +
+        (item.dayName ? item.dayName.slice(0, 3) + " " : "") + (item.date || "") +
         " | P: " + (item.present || 0) +
         " A: " + (item.absent || 0) +
         " X: " + (item.excused || 0)
@@ -195,6 +237,7 @@ async function loadSavedList() {
       li.addEventListener("click", function () {
         className.value = item.className;
         registerDate.value = item.date;
+        updateDayLine();
         loadRegister();
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
@@ -210,11 +253,22 @@ async function loadSavedList() {
 
 document.getElementById("refreshSavedBtn").addEventListener("click", loadSavedList);
 
+// ---------- MORNING / AFTERNOON TABS ----------
+function setSession(s) {
+  session = s;
+  document.getElementById("amTab").classList.toggle("active", s === "am");
+  document.getElementById("pmTab").classList.toggle("active", s === "pm");
+  render();
+}
+document.getElementById("amTab").addEventListener("click", function () { setSession("am"); });
+document.getElementById("pmTab").addEventListener("click", function () { setSession("pm"); });
+
 // ---------- DRAW THE TABLE ----------
 function statusButton(index, status, label, current) {
   const btn = make("button", "status-btn " + status + (current === status ? " active" : ""), label);
   btn.dataset.i = index;
   btn.dataset.s = status;
+  btn.disabled = locked;
   return btn;
 }
 
@@ -229,21 +283,22 @@ function render() {
     tr.appendChild(make("td", "", student.adm || "-"));
 
     const tdP = document.createElement("td");
-    tdP.appendChild(statusButton(index, "present", "P", student.status));
+    tdP.appendChild(statusButton(index, "present", "P", student[session]));
     tr.appendChild(tdP);
 
     const tdA = document.createElement("td");
-    tdA.appendChild(statusButton(index, "absent", "A", student.status));
+    tdA.appendChild(statusButton(index, "absent", "A", student[session]));
     tr.appendChild(tdA);
 
     const tdX = document.createElement("td");
-    tdX.appendChild(statusButton(index, "excused", "X", student.status));
+    tdX.appendChild(statusButton(index, "excused", "X", student[session]));
     tr.appendChild(tdX);
 
     const tdD = document.createElement("td");
     const del = make("button", "remove-btn", "\u00d7");
     del.dataset.i = index;
     del.dataset.remove = "1";
+    del.disabled = locked;
     tdD.appendChild(del);
     tr.appendChild(tdD);
 
@@ -251,21 +306,87 @@ function render() {
   });
 
   updateCounts();
+  renderReport();
 }
 
 function updateCounts() {
-  const present = students.filter(function (s) { return s.status === "present"; }).length;
-  const absent = students.filter(function (s) { return s.status === "absent"; }).length;
+  const present = students.filter(function (s) { return s[session] === "present"; }).length;
+  const absent = students.filter(function (s) { return s[session] === "absent"; }).length;
 
   document.getElementById("totalCount").textContent = students.length;
   document.getElementById("presentCount").textContent = present;
   document.getElementById("absentCount").textContent = absent;
 }
 
+// ---------- REPORT: full day, morning only, afternoon only, absent ----------
+function category(s) {
+  const a = s.am === "present";
+  const p = s.pm === "present";
+  if (a && p) return "full";
+  if (a) return "am";
+  if (p) return "pm";
+  if (s.am === "absent" || s.pm === "absent") return "abs";
+  if (s.am === "excused" || s.pm === "excused") return "exc";
+  return "none";
+}
+
+function groups() {
+  const g = { full: [], am: [], pm: [], abs: [], exc: [], none: [] };
+  students.forEach(function (s) { g[category(s)].push(s); });
+  return g;
+}
+
+const GROUP_TITLES = [
+  ["full", "Present full day"],
+  ["am", "Present morning only"],
+  ["pm", "Present afternoon only"],
+  ["abs", "Absent"],
+  ["exc", "Excused"]
+];
+
+function renderReport() {
+  const box = document.getElementById("reportBox");
+  box.textContent = "";
+  const g = groups();
+  const presentAny = g.full.length + g.am.length + g.pm.length;
+
+  box.appendChild(make("p", "rhead",
+    (className.value.trim() || "No class name") + " - " + dayText(registerDate.value)));
+
+  const tot = make("div", "rtotals");
+  tot.appendChild(make("span", "", "Total: " + students.length));
+  tot.appendChild(make("span", "", "Present: " + presentAny));
+  tot.appendChild(make("span", "", "Absent: " + g.abs.length));
+  if (g.exc.length) tot.appendChild(make("span", "", "Excused: " + g.exc.length));
+  if (g.none.length) tot.appendChild(make("span", "", "Not marked: " + g.none.length));
+  box.appendChild(tot);
+
+  GROUP_TITLES.forEach(function (t) {
+    const list = g[t[0]];
+    if (list.length === 0) return;
+    const div = make("div", "rgroup " + t[0]);
+    div.appendChild(make("h3", "", t[1] + " (" + list.length + ")"));
+    const ul = document.createElement("ul");
+    list.forEach(function (s, i) {
+      ul.appendChild(make("li", "", (i + 1) + ". " + s.name + " - Adm " + (s.adm || "-")));
+    });
+    div.appendChild(ul);
+    box.appendChild(div);
+  });
+}
+
+document.getElementById("printBtn").addEventListener("click", function () {
+  window.print();
+});
+
 // ---------- CLICKS ON P, A, X, DELETE ----------
 studentList.addEventListener("click", async function (e) {
   const btn = e.target.closest("button");
   if (!btn) return;
+  if (locked) {
+    alert("This register is approved and locked.");
+    return;
+  }
   const i = Number(btn.dataset.i);
 
   if (btn.dataset.remove) {
@@ -275,7 +396,7 @@ studentList.addEventListener("click", async function (e) {
       render();
     }
   } else {
-    students[i].status = btn.dataset.s;
+    students[i][session] = btn.dataset.s;
     render();
   }
 });
@@ -298,6 +419,10 @@ async function saveRoster() {
 
 // ---------- ADD A NEW STUDENT (ONCE ONLY) ----------
 document.getElementById("addBtn").addEventListener("click", async function () {
+  if (locked) {
+    alert("This register is approved and locked.");
+    return;
+  }
   if (className.value.trim() === "") {
     alert("Please type the class name first.");
     return;
@@ -318,7 +443,7 @@ document.getElementById("addBtn").addEventListener("click", async function () {
     return;
   }
 
-  students.push({ name: name, adm: adm, status: "none" });
+  students.push({ name: name, adm: adm, am: "none", pm: "none" });
   studentName.value = "";
   admNo.value = "";
   studentName.focus();
@@ -341,21 +466,47 @@ admNo.addEventListener("keypress", function (e) {
 
 // ---------- MARK ALL / RESET ----------
 document.getElementById("allPresentBtn").addEventListener("click", function () {
-  students.forEach(function (s) { s.status = "present"; });
+  if (locked) return;
+  students.forEach(function (s) { s[session] = "present"; });
   render();
 });
 
 document.getElementById("clearBtn").addEventListener("click", function () {
-  if (confirm("Reset all ticks for this day? Students stay in the class list.")) {
-    students.forEach(function (s) { s.status = "none"; });
+  if (locked) return;
+  if (confirm("Reset all ticks for this day (morning and afternoon)? Students stay in the class list.")) {
+    students.forEach(function (s) { s.am = "none"; s.pm = "none"; });
     render();
   }
 });
+
+// ---------- BUILD THE DOCUMENT THAT IS SAVED ----------
+function buildRegisterDoc(ap) {
+  const g = groups();
+  const d = {
+    className: className.value.trim(),
+    date: registerDate.value,
+    dayName: dayName(registerDate.value),
+    total: students.length,
+    present: g.full.length + g.am.length + g.pm.length,
+    fullDay: g.full.length,
+    morningOnly: g.am.length,
+    afternoonOnly: g.pm.length,
+    absent: g.abs.length,
+    excused: g.exc.length,
+    students: students
+  };
+  if (ap) d.approval = ap;
+  return d;
+}
 
 // ---------- SAVE TODAY'S REGISTER ----------
 document.getElementById("saveBtn").addEventListener("click", async function () {
   if (!currentUser) {
     alert("Please log in first.");
+    return;
+  }
+  if (locked) {
+    alert("This register is approved and locked.");
     return;
   }
   if (className.value.trim() === "") {
@@ -367,29 +518,193 @@ document.getElementById("saveBtn").addEventListener("click", async function () {
     return;
   }
 
-  const present = students.filter(function (s) { return s.status === "present"; }).length;
-  const absent = students.filter(function (s) { return s.status === "absent"; }).length;
-  const excused = students.filter(function (s) { return s.status === "excused"; }).length;
-
   try {
     await saveRoster();
-    await setDoc(registerRef(), {
-      className: className.value.trim(),
-      date: registerDate.value,
-      total: students.length,
-      present: present,
-      absent: absent,
-      excused: excused,
-      students: students
-    });
-    alert("Saved for " + className.value + " on " + registerDate.value +
-      ". Present: " + present + ", Absent: " + absent + ", Excused: " + excused);
+    const d = buildRegisterDoc(null);
+    await setDoc(registerRef(), d);
+    alert("Saved for " + className.value + " on " + dayText(registerDate.value) +
+      ". Present: " + d.present + ", Absent: " + d.absent + ", Excused: " + d.excused);
     loadSavedList();
   } catch (e) {
     alert("Could not save: " + e.message);
   }
 });
 
+// ---------- SCHOOL STAMP ----------
+function showStampPreview() {
+  const img = document.getElementById("stampPreview");
+  if (stampData) {
+    img.src = stampData;
+    img.style.display = "block";
+  } else {
+    img.style.display = "none";
+  }
+}
+
+async function loadStamp() {
+  try {
+    const snap = await getDoc(stampRef());
+    stampData = snap.exists() ? (snap.data().image || "") : "";
+  } catch (e) {
+    stampData = "";
+  }
+  showStampPreview();
+}
+
+document.getElementById("stampBtn").addEventListener("click", function () {
+  document.getElementById("stampFile").click();
+});
+
+document.getElementById("stampFile").addEventListener("change", function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = async function () {
+      const scale = Math.min(1, 240 / img.width);
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      stampData = c.toDataURL("image/png");
+      showStampPreview();
+      try {
+        await setDoc(stampRef(), { image: stampData });
+      } catch (err) {
+        alert("Could not save stamp: " + err.message);
+      }
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+});
+
+// ---------- SIGNATURE BOX ----------
+const sig = document.getElementById("sigCanvas");
+const sctx = sig.getContext("2d");
+let drawing = false;
+let hasInk = false;
+sctx.lineWidth = 2.5;
+sctx.lineCap = "round";
+sctx.strokeStyle = "#0f2a4a";
+
+function sigPoint(e) {
+  const r = sig.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * sig.width / r.width,
+    y: (e.clientY - r.top) * sig.height / r.height
+  };
+}
+
+sig.addEventListener("pointerdown", function (e) {
+  drawing = true;
+  const p = sigPoint(e);
+  sctx.beginPath();
+  sctx.moveTo(p.x, p.y);
+  sig.setPointerCapture(e.pointerId);
+});
+
+sig.addEventListener("pointermove", function (e) {
+  if (!drawing) return;
+  const p = sigPoint(e);
+  sctx.lineTo(p.x, p.y);
+  sctx.stroke();
+  hasInk = true;
+});
+
+function stopDraw() { drawing = false; }
+sig.addEventListener("pointerup", stopDraw);
+sig.addEventListener("pointercancel", stopDraw);
+
+function clearSig() {
+  sctx.clearRect(0, 0, sig.width, sig.height);
+  hasInk = false;
+}
+document.getElementById("sigClearBtn").addEventListener("click", clearSig);
+
+// ---------- APPROVAL ----------
+function renderApproval() {
+  const form = document.getElementById("signForm");
+  const view = document.getElementById("approvalView");
+  view.textContent = "";
+
+  if (approval) {
+    form.style.display = "none";
+    view.style.display = "block";
+    view.appendChild(make("p", "rhead", "Approved and locked"));
+    view.appendChild(make("p", "note",
+      "Signed by " + approval.name + " on " + new Date(approval.time).toLocaleString("en-GB")));
+    const wrap = make("div", "apv");
+    const s = document.createElement("img");
+    s.src = approval.signature;
+    s.alt = "Signature";
+    wrap.appendChild(s);
+    if (approval.stamp) {
+      const st = document.createElement("img");
+      st.src = approval.stamp;
+      st.alt = "School stamp";
+      wrap.appendChild(st);
+    }
+    view.appendChild(wrap);
+  } else {
+    form.style.display = "block";
+    view.style.display = "none";
+  }
+}
+
+document.getElementById("approveBtn").addEventListener("click", async function () {
+  if (!currentUser) {
+    alert("Please log in first.");
+    return;
+  }
+  if (locked) return;
+  if (className.value.trim() === "") {
+    alert("Please type the class name first.");
+    return;
+  }
+  if (students.length === 0) {
+    alert("Add students to the class first.");
+    return;
+  }
+  const nm = approverName.value.trim();
+  if (nm === "") {
+    alert("Type the name of the deputy principal.");
+    return;
+  }
+  if (!hasInk) {
+    alert("Please sign in the signature box.");
+    return;
+  }
+  if (!confirm("Approve and lock this register? It cannot be changed afterwards.")) return;
+
+  const ap = {
+    name: nm,
+    signature: sig.toDataURL("image/png"),
+    stamp: stampData,
+    time: new Date().toISOString()
+  };
+
+  try {
+    await saveRoster();
+    await setDoc(registerRef(), buildRegisterDoc(ap));
+    approval = ap;
+    locked = true;
+    clearSig();
+    approverName.value = "";
+    render();
+    renderApproval();
+    loadSavedList();
+    alert("Register approved and locked.");
+  } catch (e) {
+    alert("Could not approve: " + e.message);
+  }
+});
+
 // ---------- RELOAD WHEN CLASS OR DATE CHANGES ----------
-registerDate.addEventListener("change", loadRegister);
+registerDate.addEventListener("change", function () {
+  updateDayLine();
+  loadRegister();
+});
 className.addEventListener("change", loadRegister);
