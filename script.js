@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, collection, getDocs
+  getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -913,19 +913,33 @@ document.getElementById("graphPrintBtn").addEventListener("click", function () {
   document.body.classList.remove("print-graph");
 });
 
-// ---------- RESULTS (exam, assessment, discipline, recommendation, reflection) ----------
+// ---------- RESULTS, RANKING, PERFORMANCE GRAPH, CLASS REPORT FORM ----------
+const DEFAULT_SUBJECTS = ["Mathematics", "English", "Kiswahili", "Science", "Social Studies"];
 let resultsData = {};
+let subjectList = DEFAULT_SUBJECTS.slice();
 const resStudent = document.getElementById("resStudent");
+const resSubjects = document.getElementById("resSubjects");
 document.getElementById("resYear").value = new Date().getFullYear();
+resSubjects.value = subjectList.join(", ");
 
 function studentKey(s) {
   return s.adm || s.name.toLowerCase();
 }
 
+function termLabel() {
+  return "Term " + document.getElementById("resTerm").value + ", " + document.getElementById("resYear").value;
+}
+
+function termKey() {
+  return classKey() + "_" + document.getElementById("resYear").value.trim() + "_T" + document.getElementById("resTerm").value;
+}
+
 function resRef() {
-  const term = document.getElementById("resTerm").value;
-  const year = document.getElementById("resYear").value.trim();
-  return doc(db, "users", currentUser.uid, "results", classKey() + "_" + year + "_T" + term);
+  return doc(db, "users", currentUser.uid, "results", termKey());
+}
+
+function reportRef() {
+  return doc(db, "users", currentUser.uid, "reports", termKey());
 }
 
 function fillResStudents() {
@@ -940,22 +954,53 @@ function fillResStudents() {
   if (keep) resStudent.value = keep;
 }
 
+function parseSubjects() {
+  const list = resSubjects.value.split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t !== ""; });
+  return list.length ? list : DEFAULT_SUBJECTS.slice();
+}
+
+function renderMarkInputs() {
+  const box = document.getElementById("resMarks");
+  box.textContent = "";
+  const marks = (resultsData[resStudent.value] || {}).marks || {};
+  subjectList.forEach(function (sub) {
+    const row = make("div", "markrow");
+    row.appendChild(make("span", "", sub));
+    const inp = document.createElement("input");
+    inp.type = "number";
+    inp.min = "0";
+    inp.max = "100";
+    inp.placeholder = "Mark";
+    inp.dataset.sub = sub;
+    if (marks[sub] !== undefined) inp.value = marks[sub];
+    row.appendChild(inp);
+    box.appendChild(row);
+  });
+}
+
 function showResRecord() {
   const r = resultsData[resStudent.value] || {};
-  document.getElementById("resExam").value = r.exam || "";
   document.getElementById("resAssess").value = r.assess || "";
   document.getElementById("resDisc").value = r.disc || "Good";
   document.getElementById("resDiscNote").value = r.discNote || "";
   document.getElementById("resRec").value = r.rec || "";
   document.getElementById("resReflect").value = r.reflect || "";
+  renderMarkInputs();
 }
 
 async function loadResults() {
   resultsData = {};
+  subjectList = parseSubjects();
   if (currentUser) {
     try {
       const snap = await getDoc(resRef());
-      if (snap.exists()) resultsData = snap.data().records || {};
+      if (snap.exists()) {
+        resultsData = snap.data().records || {};
+        if (snap.data().subjects && snap.data().subjects.length) {
+          subjectList = snap.data().subjects;
+          resSubjects.value = subjectList.join(", ");
+        }
+      }
     } catch (e) {
       resultsData = {};
     }
@@ -964,6 +1009,10 @@ async function loadResults() {
 }
 
 resStudent.addEventListener("change", showResRecord);
+resSubjects.addEventListener("change", function () {
+  subjectList = parseSubjects();
+  renderMarkInputs();
+});
 document.getElementById("resTerm").addEventListener("change", loadResults);
 document.getElementById("resYear").addEventListener("change", loadResults);
 
@@ -978,10 +1027,14 @@ document.getElementById("resSaveBtn").addEventListener("click", async function (
     return;
   }
   const s = students.find(function (x) { return studentKey(x) === resStudent.value; });
+  const marks = {};
+  document.querySelectorAll("#resMarks input").forEach(function (i) {
+    if (i.value !== "") marks[i.dataset.sub] = Math.max(0, Math.min(100, Number(i.value)));
+  });
   resultsData[resStudent.value] = {
     name: s.name,
     adm: s.adm || "",
-    exam: document.getElementById("resExam").value.trim(),
+    marks: marks,
     assess: document.getElementById("resAssess").value.trim(),
     disc: document.getElementById("resDisc").value,
     discNote: document.getElementById("resDiscNote").value.trim(),
@@ -993,6 +1046,7 @@ document.getElementById("resSaveBtn").addEventListener("click", async function (
       className: className.value.trim(),
       year: document.getElementById("resYear").value.trim(),
       term: document.getElementById("resTerm").value,
+      subjects: subjectList,
       records: resultsData
     });
     alert("Saved for " + s.name + ".");
@@ -1001,6 +1055,54 @@ document.getElementById("resSaveBtn").addEventListener("click", async function (
   }
 });
 
+// ----- ranking: by mean mark, equal means share a position -----
+function computeRanks() {
+  const rows = students.map(function (s) {
+    const r = resultsData[studentKey(s)] || {};
+    const marks = r.marks || {};
+    let total = 0;
+    let n = 0;
+    subjectList.forEach(function (sub) {
+      if (marks[sub] !== undefined) { total += marks[sub]; n++; }
+    });
+    return { s: s, r: r, marks: marks, total: total, n: n, mean: n ? total / n : null };
+  });
+  const ranked = rows.filter(function (x) { return x.mean !== null; })
+    .sort(function (a, b) { return b.mean - a.mean; });
+  ranked.forEach(function (x, i) {
+    x.pos = (i > 0 && x.mean === ranked[i - 1].mean) ? ranked[i - 1].pos : i + 1;
+  });
+  const rest = rows.filter(function (x) { return x.mean === null; });
+  rest.forEach(function (x) { x.pos = "-"; });
+  return ranked.concat(rest);
+}
+
+function perfBand(m) {
+  return m >= 70 ? "good" : m >= 50 ? "mid" : "low";
+}
+
+function bar(label, pct, detail) {
+  const row = make("div", "grow");
+  row.appendChild(make("div", "gname", label));
+  const track = make("div", "gtrack");
+  const fill = make("div", "gfill " + perfBand(pct));
+  fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+  track.appendChild(fill);
+  row.appendChild(track);
+  row.appendChild(make("div", "gdetail", detail));
+  return row;
+}
+
+function remarkLines(r) {
+  return [
+    ["Assessment", r.assess],
+    ["Discipline", r.disc ? r.disc + (r.discNote ? " - " + r.discNote : "") : ""],
+    ["Recommendation", r.rec],
+    ["Reflection", r.reflect]
+  ];
+}
+
+// ----- ranked results list -----
 document.getElementById("resListBtn").addEventListener("click", function () {
   const box = document.getElementById("resBox");
   box.textContent = "";
@@ -1008,26 +1110,24 @@ document.getElementById("resListBtn").addEventListener("click", function () {
     box.appendChild(make("p", "note", "No students in this class yet."));
     return;
   }
-  box.appendChild(make("p", "rhead",
-    (className.value.trim() || "Class") + " - Term " + document.getElementById("resTerm").value +
-    ", " + document.getElementById("resYear").value));
-  students.forEach(function (s, i) {
-    const r = resultsData[studentKey(s)];
+  const ranked = computeRanks();
+  const marked = ranked.filter(function (x) { return x.mean !== null; }).length;
+  box.appendChild(make("p", "rhead", (className.value.trim() || "Class") + " - " + termLabel()));
+  ranked.forEach(function (x) {
     const div = make("div", "rrow");
-    div.appendChild(make("div", "gname", (i + 1) + ". " + s.name + " - Adm " + (s.adm || "-")));
-    if (!r) {
-      div.appendChild(make("div", "gdetail", "No record yet."));
+    div.appendChild(make("div", "gname", x.pos + ". " + x.s.name + " - Adm " + (x.s.adm || "-")));
+    if (x.mean === null) {
+      div.appendChild(make("div", "gdetail", "No marks yet."));
     } else {
-      [
-        ["Exam", r.exam],
-        ["Assessment", r.assess],
-        ["Discipline", r.disc + (r.discNote ? " - " + r.discNote : "")],
-        ["Recommendation", r.rec],
-        ["Reflection", r.reflect]
-      ].forEach(function (p) {
-        if (p[1]) div.appendChild(make("div", "rline", p[0] + ": " + p[1]));
-      });
+      div.appendChild(make("div", "rline",
+        "Total " + x.total + " | Mean " + x.mean.toFixed(1) + "% | Position " + x.pos + " of " + marked));
+      div.appendChild(make("div", "rline", subjectList.filter(function (sub) {
+        return x.marks[sub] !== undefined;
+      }).map(function (sub) { return sub + " " + x.marks[sub]; }).join(" | ")));
     }
+    remarkLines(x.r).forEach(function (p) {
+      if (p[1]) div.appendChild(make("div", "rline", p[0] + ": " + p[1]));
+    });
     box.appendChild(div);
   });
 });
@@ -1036,6 +1136,267 @@ document.getElementById("resPrintBtn").addEventListener("click", function () {
   document.body.classList.add("print-results");
   window.print();
   document.body.classList.remove("print-results");
+});
+
+// ----- attendance percentage per student for the term dates -----
+async function attendanceMap(cls, from, to) {
+  const out = {};
+  const snap = await getDocs(collection(db, "users", currentUser.uid, "registers"));
+  snap.forEach(function (d) {
+    const r = d.data();
+    if (r.className !== cls || !r.date || r.date < from || r.date > to) return;
+    (r.students || []).forEach(function (s) {
+      const k = studentKey(s);
+      const o = out[k] || (out[k] = { p: 0, t: 0 });
+      [s.am || s.status, s.pm || s.status].forEach(function (v) {
+        if (v === "present") o.p++;
+        if (v === "present" || v === "absent" || v === "excused") o.t++;
+      });
+    });
+  });
+  return out;
+}
+
+// ----- signature pads for the report form -----
+function makePad(c) {
+  const x = c.getContext("2d");
+  let down = false;
+  let ink = false;
+  x.lineWidth = 2.5;
+  x.lineCap = "round";
+  x.strokeStyle = "#0f2a4a";
+  function pt(e) {
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height };
+  }
+  c.addEventListener("pointerdown", function (e) {
+    down = true;
+    const p = pt(e);
+    x.beginPath();
+    x.moveTo(p.x, p.y);
+    c.setPointerCapture(e.pointerId);
+  });
+  c.addEventListener("pointermove", function (e) {
+    if (!down) return;
+    const p = pt(e);
+    x.lineTo(p.x, p.y);
+    x.stroke();
+    ink = true;
+  });
+  c.addEventListener("pointerup", function () { down = false; });
+  c.addEventListener("pointercancel", function () { down = false; });
+  return {
+    hasInk: function () { return ink; },
+    clear: function () { x.clearRect(0, 0, c.width, c.height); ink = false; },
+    data: function () { return c.toDataURL("image/png"); }
+  };
+}
+const padT = makePad(document.getElementById("rfTeacherCanvas"));
+const padD = makePad(document.getElementById("rfDeputyCanvas"));
+document.getElementById("rfTeacherClear").addEventListener("click", padT.clear);
+document.getElementById("rfDeputyClear").addEventListener("click", padD.clear);
+
+async function loadSignoff() {
+  const out = document.getElementById("rfSigned");
+  out.textContent = "";
+  let so = {};
+  try {
+    const snap = await getDoc(reportRef());
+    if (snap.exists()) so = snap.data();
+  } catch (e) {
+    so = {};
+  }
+  [["Class teacher", so.teacher], ["Deputy principal", so.deputy]].forEach(function (p) {
+    if (!p[1]) return;
+    const d = make("div", "apv");
+    d.appendChild(make("div", "note", p[0] + ": " + p[1].name + " - " + new Date(p[1].time).toLocaleString("en-GB")));
+    const img = document.createElement("img");
+    img.src = p[1].signature;
+    img.alt = "Signature";
+    d.appendChild(img);
+    if (p[1].stamp) {
+      const st = document.createElement("img");
+      st.src = p[1].stamp;
+      st.alt = "School stamp";
+      d.appendChild(st);
+    }
+    out.appendChild(d);
+  });
+}
+
+// ----- generate the class report form -----
+document.getElementById("rfBtn").addEventListener("click", async function () {
+  if (!currentUser) return;
+  const cls = className.value.trim();
+  if (cls === "") {
+    alert("Tap your class at the top first.");
+    return;
+  }
+  const box = document.getElementById("rfBox");
+  box.textContent = "";
+  const ranked = computeRanks();
+  const marked = ranked.filter(function (x) { return x.mean !== null; });
+  if (marked.length === 0) {
+    box.appendChild(make("p", "note", "Enter marks in Results and Assessment first, then generate the form."));
+    return;
+  }
+  let att = {};
+  try {
+    att = await attendanceMap(cls, document.getElementById("graphFrom").value, document.getElementById("graphTo").value);
+  } catch (e) {
+    att = {};
+  }
+
+  box.appendChild(make("p", "rhead", setup ? setup.schoolName + ", " + setup.town : "School report form"));
+  box.appendChild(make("p", "rhead", cls + " - " + termLabel()));
+  const classMean = marked.reduce(function (t, x) { return t + x.mean; }, 0) / marked.length;
+  const sum = make("div", "gsum");
+  sum.appendChild(make("span", "", "Students: " + ranked.length));
+  sum.appendChild(make("span", "", "Class mean: " + classMean.toFixed(1) + "%"));
+  sum.appendChild(make("span", "", "Top: " + marked[0].s.name + " (" + marked[0].mean.toFixed(1) + "%)"));
+  box.appendChild(sum);
+
+  // table: position, student, adm, every subject, total, mean, attendance
+  const wrap = make("div", "table-wrap");
+  const table = make("table", "rtable");
+  const hr = document.createElement("tr");
+  ["Pos", "Student", "Adm"].concat(subjectList, ["Total", "Mean", "Att%"]).forEach(function (t) {
+    hr.appendChild(make("th", "", t));
+  });
+  const thead = document.createElement("thead");
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  ranked.forEach(function (x) {
+    const tr = document.createElement("tr");
+    const a = att[studentKey(x.s)];
+    const cells = [String(x.pos), x.s.name, x.s.adm || "-"]
+      .concat(subjectList.map(function (sub) { return x.marks[sub] !== undefined ? String(x.marks[sub]) : "-"; }))
+      .concat([x.mean === null ? "-" : String(x.total), x.mean === null ? "-" : x.mean.toFixed(1),
+        a && a.t ? Math.round(a.p * 100 / a.t) + "%" : "-"]);
+    cells.forEach(function (t) { tr.appendChild(make("td", "", t)); });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+
+  // performance graphs
+  box.appendChild(make("p", "rhead", "Overall performance (mean %)"));
+  marked.forEach(function (x) {
+    box.appendChild(bar(x.pos + ". " + x.s.name, x.mean, x.mean.toFixed(1) + "% | Total " + x.total));
+  });
+  box.appendChild(make("p", "rhead", "Class average per subject"));
+  subjectList.forEach(function (sub) {
+    const vals = marked.filter(function (x) { return x.marks[sub] !== undefined; })
+      .map(function (x) { return x.marks[sub]; });
+    if (vals.length === 0) return;
+    const avg = vals.reduce(function (t, v) { return t + v; }, 0) / vals.length;
+    box.appendChild(bar(sub, avg, avg.toFixed(1) + "% (" + vals.length + " students)"));
+  });
+
+  // remarks
+  const rem = ranked.filter(function (x) { return x.r.disc || x.r.rec; });
+  if (rem.length) {
+    box.appendChild(make("p", "rhead", "Remarks"));
+    rem.forEach(function (x) {
+      box.appendChild(make("div", "rline", x.s.name + ": Discipline " + (x.r.disc || "-") +
+        (x.r.discNote ? " - " + x.r.discNote : "") + (x.r.rec ? ". Recommendation: " + x.r.rec : "")));
+    });
+  }
+
+  document.getElementById("rfSignForm").style.display = "block";
+  loadSignoff();
+});
+
+// ----- class teacher signs -----
+document.getElementById("rfTeacherBtn").addEventListener("click", async function () {
+  if (!currentUser) return;
+  const nm = document.getElementById("rfTeacherName").value.trim();
+  if (nm === "") {
+    alert("Type the class teacher's name.");
+    return;
+  }
+  if (!padT.hasInk()) {
+    alert("Please sign in the box.");
+    return;
+  }
+  try {
+    await setDoc(reportRef(), {
+      teacher: { name: nm, signature: padT.data(), time: new Date().toISOString() }
+    }, { merge: true });
+    padT.clear();
+    document.getElementById("rfTeacherName").value = "";
+    loadSignoff();
+  } catch (e) {
+    alert("Could not save: " + e.message);
+  }
+});
+
+// ----- deputy principal signs and the stamp is added (needs the PIN) -----
+document.getElementById("rfDeputyBtn").addEventListener("click", async function () {
+  if (!currentUser) return;
+  if (!setup) {
+    alert("The deputy principal must first complete the setup in the Approval card.");
+    return;
+  }
+  const nm = document.getElementById("rfDeputyName").value.trim();
+  const pin = document.getElementById("rfDeputyPin").value.trim();
+  if (nm === "") {
+    alert("Type the deputy principal's name.");
+    return;
+  }
+  if (!padD.hasInk()) {
+    alert("Please sign in the box.");
+    return;
+  }
+  if (pin === "" || (await sha(setup.salt + pin)) !== setup.pinHash) {
+    alert("Wrong PIN. Only the deputy principal can sign and stamp.");
+    return;
+  }
+  try {
+    await setDoc(reportRef(), {
+      deputy: {
+        name: nm,
+        signature: padD.data(),
+        stamp: drawStamp(setup.schoolName, setup.town, new Date()),
+        time: new Date().toISOString()
+      }
+    }, { merge: true });
+    padD.clear();
+    document.getElementById("rfDeputyName").value = "";
+    document.getElementById("rfDeputyPin").value = "";
+    loadSignoff();
+  } catch (e) {
+    alert("Could not save: " + e.message);
+  }
+});
+
+document.getElementById("rfPrintBtn").addEventListener("click", function () {
+  document.body.classList.add("print-report");
+  window.print();
+  document.body.classList.remove("print-report");
+});
+
+// ----- reset the deputy setup (wrong school name or PIN) -----
+document.getElementById("resetSetupBtn").addEventListener("click", async function () {
+  if (!currentUser || !setup) return;
+  const pin = document.getElementById("approvePin").value.trim();
+  if (pin === "" || (await sha(setup.salt + pin)) !== setup.pinHash) {
+    alert("Type the current deputy PIN in the Deputy PIN box first, then tap reset.");
+    return;
+  }
+  if (!confirm("Reset the deputy setup? You will enter the school name, town and a new PIN again.")) return;
+  try {
+    await deleteDoc(setupRef());
+    setup = null;
+    document.getElementById("approvePin").value = "";
+    renderApproval();
+    showStampPreview();
+    alert("Setup cleared. Enter the correct details.");
+  } catch (e) {
+    alert("Could not reset: " + e.message);
+  }
 });
 
 // ---------- RELOAD WHEN CLASS OR DATE CHANGES ----------

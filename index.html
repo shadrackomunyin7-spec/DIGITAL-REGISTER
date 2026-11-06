@@ -519,7 +519,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   header, #authSection, #printBtn, #signForm, #setupForm,
   #appSection > .card:nth-child(1), #appSection > .card:nth-child(2),
   #appSection > .card:nth-child(3), #appSection > .card:nth-child(4),
-  #appSection > .card:nth-child(7), #appSection > .card:nth-child(8), #appSection > .card:nth-child(9) { display: none !important; }
+  #appSection > .card:nth-child(7), #appSection > .card:nth-child(8), #appSection > .card:nth-child(9), #appSection > .card:nth-child(10) { display: none !important; }
   body { background: #fff; }
 }
 
@@ -560,6 +560,24 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
   body.print-results header, body.print-results #authSection, body.print-results #resPrintBtn,
   body.print-results #appSection > .card:not(:nth-child(9)) { display: none !important; }
   body.print-results #appSection > .card:nth-child(9) { display: block !important; }
+}
+
+#appSection > .card:nth-child(10) { --accent: var(--orange); --accent-dark: #c2410c; }
+#appSection > .card:nth-child(10) h2::before { content: "\1F4C4"; }
+.markrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.markrow span { flex: 1; font-size: 14px; }
+.markrow input[type="number"] { width: 90px; margin-bottom: 0; }
+.pad { display: block; width: 100%; height: 120px; margin-bottom: 10px; background: #fff; border: 2px dashed var(--navy); border-radius: 10px; touch-action: none; }
+.rtable { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+.rtable th { background: var(--navy); color: #fff; padding: 6px 4px; text-align: center; }
+.rtable td { padding: 5px 4px; border-bottom: 1px solid var(--border); text-align: center; }
+.rtable td:nth-child(2) { text-align: left; }
+#rfSigned img { max-width: 45%; max-height: 90px; object-fit: contain; }
+@media print {
+  body.print-report header, body.print-report #authSection, body.print-report #rfPrintBtn,
+  body.print-report #rfBtn, body.print-report #rfSignForm,
+  body.print-report #appSection > .card:not(:nth-child(10)) { display: none !important; }
+  body.print-report #appSection > .card:nth-child(10) { display: block !important; }
 }
 </style>
 </head>
@@ -686,6 +704,7 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
           <img id="stampPreview" alt="School stamp" style="display:none;">
           <input type="password" id="approvePin" inputmode="numeric" maxlength="4" placeholder="Deputy PIN" style="margin-top:10px;">
           <button id="approveBtn" class="save">Approve and lock register</button>
+          <button id="resetSetupBtn" class="linklike">Wrong school name or PIN? Type your PIN above, then tap here to reset the setup</button>
         </div>
         <div id="approvalView" style="display:none;"></div>
       </section>
@@ -725,7 +744,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
           <input type="number" id="resYear" placeholder="Year">
         </div>
         <select id="resStudent"></select>
-        <textarea id="resExam" rows="2" placeholder="Exam marks (e.g. Maths 78, English 65, Kiswahili 70)"></textarea>
+        <p class="note">Subjects for this class (separated by commas), then each mark out of 100:</p>
+        <input type="text" id="resSubjects" placeholder="Subjects, separated by commas">
+        <div id="resMarks"></div>
         <textarea id="resAssess" rows="2" placeholder="Assessment (strengths and areas to improve)"></textarea>
         <select id="resDisc">
           <option>Excellent</option>
@@ -740,6 +761,33 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
         <button id="resListBtn" class="small" style="width:100%; margin-top:10px;">Show class results list</button>
         <div id="resBox"></div>
         <button id="resPrintBtn" class="linklike">Print or save as PDF</button>
+      </section>
+
+      <!-- card 10 -->
+      <section class="card">
+        <h2>Class Report Form</h2>
+        <p class="note">Tap your class at the top, pick the term in Results above, then generate. Attendance uses the dates in the Attendance Graph card.</p>
+        <button id="rfBtn" class="save">Generate class report form</button>
+        <div id="rfBox"></div>
+        <div id="rfSigned"></div>
+        <div id="rfSignForm" style="display:none;">
+          <p class="rhead" style="margin-top:14px;">Class teacher</p>
+          <input type="text" id="rfTeacherName" placeholder="Class teacher name">
+          <canvas id="rfTeacherCanvas" class="pad" width="400" height="120"></canvas>
+          <div class="row">
+            <button id="rfTeacherClear" class="small danger">Clear</button>
+            <button id="rfTeacherBtn" class="small">Sign as class teacher</button>
+          </div>
+          <p class="rhead" style="margin-top:14px;">Deputy principal</p>
+          <input type="text" id="rfDeputyName" placeholder="Deputy principal name">
+          <canvas id="rfDeputyCanvas" class="pad" width="400" height="120"></canvas>
+          <input type="password" id="rfDeputyPin" inputmode="numeric" maxlength="4" placeholder="Deputy PIN">
+          <div class="row">
+            <button id="rfDeputyClear" class="small danger">Clear</button>
+            <button id="rfDeputyBtn" class="small">Sign and stamp</button>
+          </div>
+        </div>
+        <button id="rfPrintBtn" class="linklike">Print or save as PDF</button>
       </section>
 
     </div>
