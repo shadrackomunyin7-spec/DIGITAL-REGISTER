@@ -926,6 +926,8 @@ function studentKey(s) {
   return s.adm || s.name.toLowerCase();
 }
 
+let rfKey = "";   // "" = class report form, otherwise one student
+
 function termLabel() {
   return "Term " + document.getElementById("resTerm").value + ", " + document.getElementById("resYear").value;
 }
@@ -939,7 +941,7 @@ function resRef() {
 }
 
 function reportRef() {
-  return doc(db, "users", currentUser.uid, "reports", termKey());
+  return doc(db, "users", currentUser.uid, "reports", termKey() + rfKey);
 }
 
 function fillResStudents() {
@@ -952,6 +954,11 @@ function fillResStudents() {
     resStudent.appendChild(o);
   });
   if (keep) resStudent.value = keep;
+  const rf = document.getElementById("rfStudent");
+  const keepRf = rf.value;
+  rf.textContent = "";
+  Array.from(resStudent.options).forEach(function (o) { rf.appendChild(o.cloneNode(true)); });
+  if (keepRf) rf.value = keepRf;
 }
 
 function parseSubjects() {
@@ -1232,6 +1239,7 @@ document.getElementById("rfBtn").addEventListener("click", async function () {
     alert("Tap your class at the top first.");
     return;
   }
+  rfKey = "";
   const box = document.getElementById("rfBox");
   box.textContent = "";
   const ranked = computeRanks();
@@ -1281,19 +1289,8 @@ document.getElementById("rfBtn").addEventListener("click", async function () {
   wrap.appendChild(table);
   box.appendChild(wrap);
 
-  // performance graphs
-  box.appendChild(make("p", "rhead", "Overall performance (mean %)"));
-  marked.forEach(function (x) {
-    box.appendChild(bar(x.pos + ". " + x.s.name, x.mean, x.mean.toFixed(1) + "% | Total " + x.total));
-  });
-  box.appendChild(make("p", "rhead", "Class average per subject"));
-  subjectList.forEach(function (sub) {
-    const vals = marked.filter(function (x) { return x.marks[sub] !== undefined; })
-      .map(function (x) { return x.marks[sub]; });
-    if (vals.length === 0) return;
-    const avg = vals.reduce(function (t, v) { return t + v; }, 0) / vals.length;
-    box.appendChild(bar(sub, avg, avg.toFixed(1) + "% (" + vals.length + " students)"));
-  });
+  // performance graphs (bar or line)
+  renderClassGraphs(box, marked);
 
   // remarks
   const rem = ranked.filter(function (x) { return x.r.disc || x.r.rec; });
@@ -1397,6 +1394,194 @@ document.getElementById("resetSetupBtn").addEventListener("click", async functio
   } catch (e) {
     alert("Could not reset: " + e.message);
   }
+});
+
+// ---------- GRAPHS (bar or line), LEVELS, INDIVIDUAL REPORT FORM ----------
+function graphType() {
+  return document.getElementById("graphType").value;
+}
+
+function lineChart(labels, series) {
+  const ns = "http://www.w3.org/2000/svg";
+  const W = 400, H = 220, L = 30, R = 10, T = 12, B = 34;
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("class", "linechart");
+  function el(tag, attrs, text) {
+    const e = document.createElementNS(ns, tag);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text !== undefined) e.textContent = text;
+    svg.appendChild(e);
+  }
+  function px(i) { return labels.length === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (labels.length - 1); }
+  function py(v) { return T + (100 - v) * (H - T - B) / 100; }
+  [0, 50, 100].forEach(function (v) {
+    el("line", { x1: L, y1: py(v), x2: W - R, y2: py(v), stroke: "#cbd5e1", "stroke-width": 1 });
+    el("text", { x: L - 4, y: py(v) + 3, "text-anchor": "end", "font-size": 9, fill: "#64748b" }, String(v));
+  });
+  const step = Math.ceil(labels.length / 10);
+  labels.forEach(function (t, i) {
+    if (i % step === 0) el("text", { x: px(i), y: H - B + 14, "text-anchor": "middle", "font-size": 9, fill: "#64748b" }, t);
+  });
+  series.forEach(function (s) {
+    el("polyline", {
+      points: s.values.map(function (v, i) { return px(i) + "," + py(v); }).join(" "),
+      fill: "none", stroke: s.color, "stroke-width": 2
+    });
+    s.values.forEach(function (v, i) { el("circle", { cx: px(i), cy: py(v), r: 3, fill: s.color }); });
+  });
+  return svg;
+}
+
+function addChart(box, title, items, caption) {
+  box.appendChild(make("p", "rhead", title));
+  if (items.length === 0) return;
+  if (graphType() === "line") {
+    box.appendChild(lineChart(items.map(function (i) { return i.short || i.label; }),
+      [{ values: items.map(function (i) { return i.value; }), color: "#2563eb" }]));
+    if (caption) box.appendChild(make("p", "note", caption));
+  } else {
+    items.forEach(function (i) { box.appendChild(bar(i.label, i.value, i.detail)); });
+  }
+}
+
+function addCompare(box, title, items) {
+  box.appendChild(make("p", "rhead", title));
+  if (items.length === 0) return;
+  if (graphType() === "line") {
+    box.appendChild(lineChart(items.map(function (i) { return i.short; }), [
+      { values: items.map(function (i) { return i.value; }), color: "#2563eb" },
+      { values: items.map(function (i) { return i.avg; }), color: "#ea580c" }
+    ]));
+    box.appendChild(make("p", "note", "Blue line: this student. Orange line: class average."));
+  } else {
+    items.forEach(function (i) {
+      box.appendChild(bar(i.label, i.value, i.value + " (class average " + i.avg.toFixed(1) + ")"));
+    });
+  }
+}
+
+function subjectAverages(marked) {
+  const out = {};
+  subjectList.forEach(function (sub) {
+    const vals = marked.filter(function (x) { return x.marks[sub] !== undefined; })
+      .map(function (x) { return x.marks[sub]; });
+    if (vals.length) out[sub] = { avg: vals.reduce(function (t, v) { return t + v; }, 0) / vals.length, n: vals.length };
+  });
+  return out;
+}
+
+function renderClassGraphs(box, marked) {
+  addChart(box, "Overall performance (mean %)", marked.map(function (x) {
+    return { label: x.pos + ". " + x.s.name, short: String(x.pos), value: x.mean,
+      detail: x.mean.toFixed(1) + "% | Total " + x.total };
+  }), "Each point is a student, position 1 on the left.");
+  const sa = subjectAverages(marked);
+  addChart(box, "Class average per subject", Object.keys(sa).map(function (sub) {
+    return { label: sub, short: sub.slice(0, 5), value: sa[sub].avg,
+      detail: sa[sub].avg.toFixed(1) + "% (" + sa[sub].n + " students)" };
+  }), "");
+}
+
+document.getElementById("resGraphBtn").addEventListener("click", function () {
+  const box = document.getElementById("resGraph");
+  box.textContent = "";
+  const marked = computeRanks().filter(function (x) { return x.mean !== null; });
+  if (marked.length === 0) {
+    box.appendChild(make("p", "note", "Save marks for some students first."));
+    return;
+  }
+  renderClassGraphs(box, marked);
+});
+
+// ----- subjects by level (starting lists, you can edit them) -----
+const LEVELS = {
+  lower: "English, Kiswahili, Mathematics, Environmental Activities, Religious Education, Creative Activities",
+  upper: "English, Kiswahili, Mathematics, Science and Technology, Social Studies, Agriculture and Nutrition, Religious Education, Creative Arts",
+  junior: "English, Kiswahili, Mathematics, Integrated Science, Health Education, Pre-Technical Studies, Social Studies, Religious Education, Business Studies, Agriculture, Life Skills, Sports and Physical Education",
+  senior: "English, Kiswahili, Community Service Learning, Physical Education, Mathematics, Biology, Chemistry, Physics, Geography, History, Business Studies, Computer Studies",
+  forms: "English, Kiswahili, Mathematics, Biology, Chemistry, Physics, History, Geography, CRE, Business Studies, Agriculture, Computer Studies"
+};
+
+document.getElementById("resLevel").addEventListener("change", function () {
+  if (!this.value) return;
+  resSubjects.value = LEVELS[this.value];
+  subjectList = parseSubjects();
+  renderMarkInputs();
+  this.value = "";
+});
+
+// ----- individual student report form -----
+document.getElementById("rfStudentBtn").addEventListener("click", async function () {
+  if (!currentUser) return;
+  const cls = className.value.trim();
+  if (cls === "") {
+    alert("Tap your class at the top first.");
+    return;
+  }
+  const key = document.getElementById("rfStudent").value;
+  const ranked = computeRanks();
+  const x = ranked.find(function (r) { return studentKey(r.s) === key; });
+  if (!x) {
+    alert("Choose a student.");
+    return;
+  }
+  if (x.mean === null) {
+    alert("Enter and save this student's marks first.");
+    return;
+  }
+  const marked = ranked.filter(function (r) { return r.mean !== null; });
+  let att = {};
+  try {
+    att = await attendanceMap(cls, document.getElementById("graphFrom").value, document.getElementById("graphTo").value);
+  } catch (e) {
+    att = {};
+  }
+  rfKey = "" + key.replace(/[^A-Za-z0-9-]/g, "_");
+
+  const box = document.getElementById("rfBox");
+  box.textContent = "";
+  box.appendChild(make("p", "rhead", setup ? setup.schoolName + ", " + setup.town : "Student report form"));
+  box.appendChild(make("p", "rhead", cls + " - " + termLabel()));
+  box.appendChild(make("p", "rhead", x.s.name + " - Adm " + (x.s.adm || "-")));
+
+  const a = att[key];
+  const sum = make("div", "gsum");
+  sum.appendChild(make("span", "", "Position: " + x.pos + " of " + marked.length));
+  sum.appendChild(make("span", "", "Total: " + x.total));
+  sum.appendChild(make("span", "", "Mean: " + x.mean.toFixed(1) + "%"));
+  sum.appendChild(make("span", "", "Attendance: " + (a && a.t ? Math.round(a.p * 100 / a.t) + "%" : "-")));
+  box.appendChild(sum);
+
+  const sa = subjectAverages(marked);
+  const subs = subjectList.filter(function (sub) { return x.marks[sub] !== undefined && sa[sub]; });
+  const table = make("table", "rtable");
+  const hr = document.createElement("tr");
+  ["Subject", "Mark", "Class average"].forEach(function (t) { hr.appendChild(make("th", "", t)); });
+  const thead = document.createElement("thead");
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  subs.forEach(function (sub) {
+    const tr = document.createElement("tr");
+    [sub, String(x.marks[sub]), sa[sub].avg.toFixed(1)].forEach(function (t) { tr.appendChild(make("td", "", t)); });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  const wrap = make("div", "table-wrap");
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+
+  addCompare(box, "Performance per subject", subs.map(function (sub) {
+    return { label: sub, short: sub.slice(0, 5), value: x.marks[sub], avg: sa[sub].avg };
+  }));
+
+  remarkLines(x.r).forEach(function (p) {
+    if (p[1]) box.appendChild(make("div", "rline", p[0] + ": " + p[1]));
+  });
+
+  document.getElementById("rfSignForm").style.display = "block";
+  loadSignoff();
 });
 
 // ---------- RELOAD WHEN CLASS OR DATE CHANGES ----------

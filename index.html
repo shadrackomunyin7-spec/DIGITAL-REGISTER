@@ -575,10 +575,11 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
 #rfSigned img { max-width: 45%; max-height: 90px; object-fit: contain; }
 @media print {
   body.print-report header, body.print-report #authSection, body.print-report #rfPrintBtn,
-  body.print-report #rfBtn, body.print-report #rfSignForm,
+  body.print-report #rfBtn, body.print-report #rfStudentBtn, body.print-report #rfStudent, body.print-report #rfSignForm,
   body.print-report #appSection > .card:not(:nth-child(10)) { display: none !important; }
   body.print-report #appSection > .card:nth-child(10) { display: block !important; }
 }
+.linechart { display: block; width: 100%; height: auto; margin: 8px 0; background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; }
 </style>
 </head>
 <body>
@@ -745,6 +746,14 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
         </div>
         <select id="resStudent"></select>
         <p class="note">Subjects for this class (separated by commas), then each mark out of 100:</p>
+        <select id="resLevel">
+          <option value="">Fill subjects by level (optional)...</option>
+          <option value="lower">Lower primary (Grade 1-3)</option>
+          <option value="upper">Upper primary (Grade 4-6)</option>
+          <option value="junior">Junior school (Grade 7-9)</option>
+          <option value="senior">Senior school (Grade 10-12)</option>
+          <option value="forms">Secondary (Form 1-4)</option>
+        </select>
         <input type="text" id="resSubjects" placeholder="Subjects, separated by commas">
         <div id="resMarks"></div>
         <textarea id="resAssess" rows="2" placeholder="Assessment (strengths and areas to improve)"></textarea>
@@ -759,15 +768,24 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--
         <textarea id="resReflect" rows="2" placeholder="Reflection"></textarea>
         <button id="resSaveBtn" class="save">Save this student's record</button>
         <button id="resListBtn" class="small" style="width:100%; margin-top:10px;">Show class results list</button>
+        <select id="graphType" style="margin-top:10px;">
+          <option value="bar">Graph style: bar graph</option>
+          <option value="line">Graph style: line graph</option>
+        </select>
+        <button id="resGraphBtn" class="small" style="width:100%;">Show performance graph</button>
         <div id="resBox"></div>
+        <div id="resGraph"></div>
         <button id="resPrintBtn" class="linklike">Print or save as PDF</button>
       </section>
 
       <!-- card 10 -->
       <section class="card">
         <h2>Class Report Form</h2>
-        <p class="note">Tap your class at the top, pick the term in Results above, then generate. Attendance uses the dates in the Attendance Graph card.</p>
+        <p class="note">Tap your class at the top, pick the term in Results above, then generate. Attendance uses the dates in the Attendance Graph card. Graph style (bar or line) is chosen in Results and Assessment.</p>
         <button id="rfBtn" class="save">Generate class report form</button>
+        <p class="note" style="margin-top:12px;">Or choose one student:</p>
+        <select id="rfStudent"></select>
+        <button id="rfStudentBtn" class="save">Generate report form for this student</button>
         <div id="rfBox"></div>
         <div id="rfSigned"></div>
         <div id="rfSignForm" style="display:none;">
