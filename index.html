@@ -516,10 +516,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 #approvalView img { max-width: 45%; max-height: 90px; object-fit: contain; }
 
 @media print {
-  header, #authSection, #printBtn, #signForm,
+  header, #authSection, #printBtn, #signForm, #setupForm,
   #appSection > .card:nth-child(1), #appSection > .card:nth-child(2),
   #appSection > .card:nth-child(3), #appSection > .card:nth-child(4),
-  #appSection > .card:nth-child(7) { display: none !important; }
+  #appSection > .card:nth-child(7), #appSection > .card:nth-child(8), #appSection > .card:nth-child(9) { display: none !important; }
   body { background: #fff; }
 }
 
@@ -529,6 +529,38 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 #classList li:hover { background: #ede9fe; }
 #classList .saved-title { font-weight: 600; color: var(--navy); }
 #classList .saved-date { font-size: 13px; color: var(--muted); }
+
+#appSection > .card:nth-child(8) { --accent: var(--blue); --accent-dark: #1d4ed8; }
+#appSection > .card:nth-child(8) h2::before { content: "\1F4C8"; }
+.gsum { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.gsum span { background: #f1f5f9; border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+.grow { margin-bottom: 12px; }
+.gname { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+.gtrack { height: 16px; background: #e2e8f0; border-radius: 8px; overflow: hidden; }
+.gfill { height: 100%; border-radius: 8px; }
+.gfill.good { background: var(--green); }
+.gfill.mid { background: #f59e0b; }
+.gfill.low { background: var(--red); }
+.gdetail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+@media print {
+  body.print-graph header, body.print-graph #authSection, body.print-graph #graphPrintBtn,
+  body.print-graph #appSection > .card:not(:nth-child(8)) { display: none !important; }
+  body.print-graph #appSection > .card:nth-child(8) { display: block !important; }
+}
+
+#appSection > .card:nth-child(9) { --accent: var(--purple); --accent-dark: #6d28d9; }
+#appSection > .card:nth-child(9) h2::before { content: "\1F4DD"; }
+textarea, select, input[type="number"] { width: 100%; padding: 12px 14px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; background: #f8fafc; color: var(--text); }
+textarea { resize: vertical; min-height: 64px; }
+textarea:focus, select:focus { outline: none; border-color: var(--accent, var(--teal)); background: white; }
+.row select { flex: 1; margin-bottom: 0; }
+.rrow { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.rline { font-size: 14px; margin-top: 3px; }
+@media print {
+  body.print-results header, body.print-results #authSection, body.print-results #resPrintBtn,
+  body.print-results #appSection > .card:not(:nth-child(9)) { display: none !important; }
+  body.print-results #appSection > .card:nth-child(9) { display: block !important; }
+}
 </style>
 </head>
 <body>
@@ -636,16 +668,23 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
       <!-- card 6 -->
       <section class="card">
         <h2>Approval</h2>
-        <div id="signForm">
-          <p class="note">Deputy principal: type your name, sign in the box, then approve. The register will be locked.</p>
+        <div id="setupForm" style="display:none;">
+          <p class="note">Deputy principal setup (once). Choose a PIN only you know. Teachers cannot approve or stamp registers without it.</p>
+          <input type="text" id="setupSchool" placeholder="School name (e.g. Omunyin Secondary School)">
+          <input type="text" id="setupTown" placeholder="Town or county">
+          <input type="password" id="setupPin" inputmode="numeric" maxlength="4" placeholder="Create a 4-digit PIN">
+          <button id="setupBtn" class="save">Save deputy setup</button>
+        </div>
+        <div id="signForm" style="display:none;">
+          <p class="note">Deputy principal only: type your name, sign, enter your PIN, then approve. The digital stamp is added automatically.</p>
           <input type="text" id="approverName" placeholder="Name of deputy principal">
           <canvas id="sigCanvas" width="400" height="150"></canvas>
           <div class="row">
             <button id="sigClearBtn" class="small danger">Clear signature</button>
-            <button id="stampBtn" class="small">Upload school stamp</button>
           </div>
-          <input type="file" id="stampFile" accept="image/*" style="display:none;">
+          <p class="note">Stamp preview:</p>
           <img id="stampPreview" alt="School stamp" style="display:none;">
+          <input type="password" id="approvePin" inputmode="numeric" maxlength="4" placeholder="Deputy PIN" style="margin-top:10px;">
           <button id="approveBtn" class="save">Approve and lock register</button>
         </div>
         <div id="approvalView" style="display:none;"></div>
@@ -657,6 +696,50 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
         <p class="note">History: tap a day to see who was present, absent and excused. To mark today, tap your class at the top.</p>
         <ul id="savedList"></ul>
         <button id="refreshSavedBtn" class="linklike">Refresh list</button>
+      </section>
+
+      <!-- card 8 -->
+      <section class="card">
+        <h2>Attendance Graph</h2>
+        <p class="note">Tap your class at the top, choose the term dates, then tap Show graph.</p>
+        <p class="note">From (first day of term) and To (last day):</p>
+        <div class="row">
+          <input type="date" id="graphFrom">
+          <input type="date" id="graphTo">
+        </div>
+        <button id="graphBtn" class="save">Show graph for this class</button>
+        <div id="graphBox"></div>
+        <button id="graphPrintBtn" class="linklike">Print or save as PDF</button>
+      </section>
+
+      <!-- card 9 -->
+      <section class="card">
+        <h2>Results and Assessment</h2>
+        <p class="note">Tap your class at the top first. Pick the term, then each student.</p>
+        <div class="row">
+          <select id="resTerm">
+            <option value="1">Term 1</option>
+            <option value="2">Term 2</option>
+            <option value="3">Term 3</option>
+          </select>
+          <input type="number" id="resYear" placeholder="Year">
+        </div>
+        <select id="resStudent"></select>
+        <textarea id="resExam" rows="2" placeholder="Exam marks (e.g. Maths 78, English 65, Kiswahili 70)"></textarea>
+        <textarea id="resAssess" rows="2" placeholder="Assessment (strengths and areas to improve)"></textarea>
+        <select id="resDisc">
+          <option>Excellent</option>
+          <option selected>Good</option>
+          <option>Fair</option>
+          <option>Needs improvement</option>
+        </select>
+        <input type="text" id="resDiscNote" placeholder="Discipline note (optional, factual and respectful)">
+        <textarea id="resRec" rows="2" placeholder="Recommendation"></textarea>
+        <textarea id="resReflect" rows="2" placeholder="Reflection"></textarea>
+        <button id="resSaveBtn" class="save">Save this student's record</button>
+        <button id="resListBtn" class="small" style="width:100%; margin-top:10px;">Show class results list</button>
+        <div id="resBox"></div>
+        <button id="resPrintBtn" class="linklike">Print or save as PDF</button>
       </section>
 
     </div>
